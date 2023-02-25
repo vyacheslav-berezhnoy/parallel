@@ -1,0 +1,54 @@
+
+compliler: pgcc
+---
+Double
+
+program: array_double.c
+
+
+Double GPU
+
+циклы: 355.841 микросекунд
+точность: -3.1263880373444408e-12
+
+It seems that most of the time here is spent on sending the data back and forth
+
+Double CPU-Multicore
+
+loops: ?
+время: real 0m0.029s
+result: -7.2759576141834259e-12
+
+
+Double CPU-1
+
+loops: ?
+time: real 0m0.074s
+result: 1.4858389087956108e-10
+
+---
+Float
+
+program: array_float.c
+
+Float GPU
+
+loops: 330.597 microseconds 
+time: real 0m4.449s
+result: -0.0285339355
+
+Float CPU-Multicore
+
+loops: ?
+time: real 0m0.030s
+result: -0.1484375
+
+Float CPU-1
+
+loops: ?
+time: real 0m0.052s 
+result: -0.0430138633
+---
+
+I wasn't able to collect the cpu loop data. Probably because of the kernel paranoid level.
+I would probably choose to perform the task on the GPU. It gives the greatest accuracy
