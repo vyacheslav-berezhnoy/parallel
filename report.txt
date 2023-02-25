@@ -9,22 +9,23 @@ program: array_double.c
 Double GPU
 
 циклы: 355.841 микросекунд
+время: 202702.774000 
 точность: -3.1263880373444408e-12
 
-It seems that most of the time here is spent on sending the data back and forth
+It seems that most of the время here is spent on sending the data back and forth
 
 Double CPU-Multicore
 
-loops: ?
-время: real 0m0.029s
-result: -7.2759576141834259e-12
+циклы: ?
+время: 17250.094000
+точность: 2.7648638933897018e-10
 
 
 Double CPU-1
 
-loops: ?
-time: real 0m0.074s
-result: 1.4858389087956108e-10
+циклы: ?
+время: 68715.716000  
+точность: 1.4858389087956108e-10
 
 ---
 Float
@@ -33,22 +34,24 @@ program: array_float.c
 
 Float GPU
 
-loops: 330.597 microseconds 
-time: real 0m4.449s
-result: -0.0285339355
+циклы: 330.597 микросекунд 
+время: 199638.379000
+точность: 0.0121841431
 
 Float CPU-Multicore
 
-loops: ?
-time: real 0m0.030s
-result: -0.1484375
+циклы: ?
+время: 16463.184000
+точность: 0.453125
 
 Float CPU-1
 
-loops: ?
-time: real 0m0.052s 
-result: -0.0430138633
+циклы: ?
+время: 36027.744000
+точность: -0.0507613756
 ---
+Профилировать циклы в программах для CPU не получилось. На сервере данные не собираются. Вероятно, из-за того, что стоит kernel paranoid level 3.
+А на моём компьютере карта AMD. Поэтому на диаграммах сравнивал время, полученное c помощью clock_gettime. Время указано везде в микросекундах.
+Я бы выбрал GPU из-за самой высокой точности. Время выполнения программ на GPU оказалось выше на порядок. 
+Но для того, чтобы сделать выводы о быстроте выполнения циклов, не хватает информации.
 
-I wasn't able to collect the cpu loop data. Probably because of the kernel paranoid level.
-I would probably choose to perform the task on the GPU. It gives the greatest accuracy
