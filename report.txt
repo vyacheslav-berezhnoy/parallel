@@ -12,7 +12,6 @@ Double GPU
 время: 202702.774000 
 точность: -3.1263880373444408e-12
 
-It seems that most of the время here is spent on sending the data back and forth
 
 Double CPU-Multicore
 
