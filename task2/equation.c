@@ -51,10 +51,8 @@ int main(int argc, char *argv[]){
 	#pragma acc data copy(arr[:m][:(2*m)])
         {
         int p, q;
-        p = m;
-        q = 0;
-        while(iter < iter_max && err > tol) {
-                err = 0;
+        int flag = 1;
+        while(iter < iter_max && flag) {
                 if (iter % 2) { //here we change what part of the array
                                 //is considered new
                         p = 0;
@@ -64,15 +62,26 @@ int main(int argc, char *argv[]){
                         p = m;
                         q = 0;
                 }
-                #pragma acc parallel loop reduction(max:err)
+                #pragma acc parallel loop
                 for(int j = 1; j < m - 1; j++)  {
-                        #pragma acc loop reduction(max:err)
+                        #pragma acc loop
                         for(int i = 1; i < m - 1; i++) {
                                 //calculating the new value for the cell
                                 arr[i][j+p] = 0.25 * (arr[i+1][j+q] + arr[i-1][j+q]
                                                 + arr[i][j-1+q] + arr[i][j+1+q]);
-                                err = MAX(err, ABS((arr[i][j+m] - arr[i][j])));
+                                //err = MAX(err, ABS((arr[i][j+m] - arr[i][j])));
                         }
+                }
+                if (!(iter%100)) {
+                        err = 0;
+                        #pragma acc parallel loop reduction(max:err)
+                        for(int j = 1; j < m - 1; j++) {
+                                #pragma acc loop reduction(max:err)
+                                for(int i = 1; i < m - 1; i++) {
+                                        err = MAX(err, ABS((arr[i][j+m] - arr[i][j])));
+                                }
+                        }
+                        flag = err > tol;
                 }
                 iter++;
 
