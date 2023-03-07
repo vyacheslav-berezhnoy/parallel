@@ -1,12 +1,12 @@
 
-	#include <stdio.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
 #define BILLION 1000000000.0
 #define MAX(x, y) (((x)>(y))?(x):(y))
 #define ABS(x) ((x)<0 ? -(x): (x))
-#define N 1024
+#define N 1025
 int main(int argc, char *argv[]){
         struct timespec start, stop;
         clock_gettime(CLOCK_REALTIME, &start);
