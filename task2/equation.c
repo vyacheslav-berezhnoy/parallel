@@ -47,8 +47,8 @@ int main(int argc, char *argv[]){
 		arr[j][m-1] = (arr[0][m-1] + right*j); //right
 	}
 
-	//#pragma acc data copy(arr[:N][:N]) create(arrNew[:N][:N]) 
-	//{
+	#pragma acc data copy(arr[:N][:N]) create(arrNew[:N][:N]) 
+	{
 	while(err > tol && iter < iter_max) {
 		err = 0;
 		#pragma acc parallel loop reduction(max:err) 
@@ -68,7 +68,7 @@ int main(int argc, char *argv[]){
 			}
 		}
 		iter++;
-	//}
+	}
 	}
 	clock_gettime(CLOCK_REALTIME, &stop);
         delta = (stop.tv_sec - start.tv_sec)
