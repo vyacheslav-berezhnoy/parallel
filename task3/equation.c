@@ -18,6 +18,12 @@ int main(int argc, char *argv[]){
         sscanf(argv[1], "%d", &m);
         sscanf(argv[2], "%d", &iter_max);
         sscanf(argv[3], "%f", &tol);
+	if (m < 0 || m > 1024) {
+		fprintf(stderr, "Not a valid grid size! It should be between 0 and 1024");
+	}
+	if (iter_max< 0 || iter_max > 1000000) {
+                fprintf(stderr, "Not a valid number of iterations! It should be between 0 and 1000000");
+        }
         int iter = 0;
         float err = tol + 1;
         float *arr = (float*)malloc(2 * m * m * sizeof(float));
@@ -31,8 +37,8 @@ int main(int argc, char *argv[]){
         }
         arr[IDX2F(1,1,m)] = arr[IDX2F(1,m+1,m)] = 10;
         arr[IDX2F(1,m,m)] = arr[IDX2F(1,2*m,m)] = 20;
-        arr[IDX2F(m,1,m)] = arr[IDX2F(m,m+1,m)] = 30;
-        arr[IDX2F(m,m,m)] = arr[IDX2F(m,2*m,m)] = 20;
+        arr[IDX2F(m,1,m)] = arr[IDX2F(m,m+1,m)] = 20;
+        arr[IDX2F(m,m,m)] = arr[IDX2F(m,2*m,m)] = 30;
         /* coefficients for linear interpolation */
         float top, bottom, left, right;
         top = (arr[IDX2F(1,m,m)] - arr[IDX2F(1,1,m)])/(m-1);
@@ -63,12 +69,6 @@ int main(int argc, char *argv[]){
         	printf ("CUBLAS initialization failed\n");
         	return EXIT_FAILURE;
     	}
-	float* temp;
-        cudaStat = cudaMalloc ((void**)&temp, m*m*sizeof(*arr));
-        if (cudaStat != cudaSuccess) {
-                printf ("device memory allocation failed");
-                return EXIT_FAILURE;
-        }
 	float alpha = -1;
 	int p, q;
 	p = m;
@@ -76,7 +76,7 @@ int main(int argc, char *argv[]){
 	int idx = 0;
 	int flag = 1;
 	float *buff = (float*)malloc(sizeof(float));
-	#pragma acc data copy(arr[:(2*m*m)]) copyin(alpha, tol)
+	#pragma acc data copy(arr[:(2*m*m)]) copyin(alpha, tol, top, bottom, left, right)
         {
         while(iter < iter_max && flag) {
                 if (iter % 2) { //here we change what part of the array
@@ -103,24 +103,42 @@ int main(int argc, char *argv[]){
 			#pragma acc wait
 			#pragma acc host_data use_device(arr)
 			{
-				stat = cublasSetVector(m*m, sizeof(*arr),
-                                               (arr+m*m), 1, temp, 1);
-                                if (stat != CUBLAS_STATUS_SUCCESS) {
-                                        printf ("Failed to set the vector\n");
+				//here we subtract arrays to find errors
+				stat = cublasSaxpy(handle, m*m, &alpha, (arr+p*m), 1, (arr+q*m), 1);
+				if (stat != CUBLAS_STATUS_SUCCESS) {
+                                        printf ("Failed to subtract the arrays\n");
                                         // return EXIT_FAILURE;
                                 }
-
-				stat = cublasSaxpy(handle, m*m, &alpha, arr, 1, temp, 1);
-				stat = cublasIsamax(handle, m*m, temp, 1, &idx);
+				//now we find the index of the cell with the largest error
+				stat = cublasIsamax(handle, m*m, (arr+q*m), 1, &idx);
 				if (stat != CUBLAS_STATUS_SUCCESS) {
                                         printf ("Failed to find the max\n");
                                         // return EXIT_FAILURE;
                                 }
-				stat = cublasGetVector(1, sizeof(*arr), (temp + idx-1), 1, buff, 1);
+				//
+				stat = cublasGetVector(1, sizeof(*arr), (arr + q*m + idx - 1), 1, buff, 1);
 				err = ABS(*buff);
+				//if the error became lower than the tolerance, we exit
                                 flag = err > tol;
 
 			}
+			//here we refill the borders, which were changed to zeros in cublasSaxpy
+			#pragma acc parallel
+			{
+			arr[IDX2F(1,1,m)] = arr[IDX2F(1,m+1,m)] = 10;
+                        arr[IDX2F(1,m,m)] = arr[IDX2F(1,2*m,m)] = 20;
+                        arr[IDX2F(m,1,m)] = arr[IDX2F(m,m+1,m)] = 20;
+                        arr[IDX2F(m,m,m)] = arr[IDX2F(m,2*m,m)] = 30;
+			}
+                        /* coefficients for linear interpolation */
+			#pragma acc parallel loop
+                        for(int j = 1; j < m; j++) {
+                        	arr[IDX2F(1,j,m)] = arr[IDX2F(1,j+m,m)] = (arr[IDX2F(1,1,m)] + top*(j-1));   //top
+                                arr[IDX2F(m,j,m)] = arr[IDX2F(m,j+m,m)]  = (arr[IDX2F(m,1,m)] + bottom*(j-1)); //bottom
+                                arr[IDX2F(j,1,m)]  = arr[IDX2F(j,m+1,m)] = (arr[IDX2F(1,1,m)] + left*(j-1)); //left
+                                arr[IDX2F(j,m,m)] = arr[IDX2F(j,2*m,m)] = (arr[IDX2F(1,m,m)] + right*(j-1)); //right
+                        }
+
                 }
                 iter++;
 
@@ -139,7 +157,6 @@ int main(int argc, char *argv[]){
                 printf("\n");
         }
         }
-	cudaFree(temp);
 	cublasDestroy(handle);
         free(arr);
         return EXIT_SUCCESS;
