@@ -12,6 +12,7 @@ __global__ void fillBorders(float *arr, float top,
 		float bottom, float left, float right,
                           int m) {
 
+  //we perform linear interpolation on the borders of the array
   int j = blockDim.x * blockIdx.x + threadIdx.x;
 
   if ((j > 0) && (j < m)) {
@@ -23,6 +24,8 @@ __global__ void fillBorders(float *arr, float top,
 }
 __global__ void getAverage(float *arr, int p, int q,
                           int m) {
+
+  //we assign the cell the average value from a cross surrounding it
 
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   int j = blockDim.y * blockIdx.y + threadIdx.y;
@@ -104,6 +107,7 @@ int main(int argc, char *argv[]){
                         cudaGetErrorString(cudaErr));
                 exit(EXIT_FAILURE);
         }
+	//this kernel fills the borders using linear interpolation
 	fillBorders<<<(m + 1024 - 1)/1024, 1024, 0, stream>>>(d_A, top, bottom, left, right, m);
 	cudaErr = cudaMemcpyAsync(arr, d_A, size, cudaMemcpyDeviceToHost, stream);
 	if (cudaErr != cudaSuccess) {
@@ -121,7 +125,6 @@ int main(int argc, char *argv[]){
 		printf("\n");
 	}
 	}
-
 	int p, q;
 	p = m;
 	q = 0;
@@ -142,6 +145,7 @@ int main(int argc, char *argv[]){
 
 	void *d_temp_storage = NULL;
         size_t temp_storage_bytes = 0;
+	//we call DeviceReduce here to check how much memory we need for temporary storage
         cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, d_B, d_buff, m*m, stream);
         cudaMalloc(&d_temp_storage, temp_storage_bytes);
 	bool graphCreated=false;
@@ -151,6 +155,7 @@ int main(int argc, char *argv[]){
         {
         while(iter < iter_max && flag) {
 		if(!graphCreated) {
+			//here we begin capturing kernel calls in a graph before calling them. This allows us to reduce call overhead
 			cudaErr = cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal);
 
 			if (cudaErr != cudaSuccess) {
@@ -160,7 +165,7 @@ int main(int argc, char *argv[]){
                 		exit(EXIT_FAILURE);
         		}
 			for (int i = 0; i < 100; i++) {
-				q = (i % 2) * m;
+				q = (i % 2) * m; //q and p choose what array we consider new and what array we consider old
 				p = m - q;
 				getAverage<<<grid, block, 0, stream>>>(d_A, p, q, m);
 			}
@@ -194,7 +199,9 @@ int main(int argc, char *argv[]){
                                 cudaGetErrorString(cudaErr));
                                 exit(EXIT_FAILURE);
                 }
+		//we check the error every 100 iterations
 		iter += 100;
+		//here we calculate absolute values of array differences and than find the maximum diffirence, i.e. error
 		subtractArrays<<<grid, block, 0, stream>>>(d_A, d_B, m);
 		cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, d_B, d_buff, m*m, stream);
 		cudaErr = cudaMemcpyAsync(h_buff, d_buff, sizeof(float), cudaMemcpyDeviceToHost, stream);
