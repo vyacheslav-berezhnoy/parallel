@@ -54,9 +54,11 @@ int main(int argc, char *argv[]){
         sscanf(argv[3], "%f", &tol);
 	if (m < 0 || m > 1024) {
 		fprintf(stderr, "Not a valid grid size! It should be between 0 and 1024");
+		exit(EXIT_FAILURE);
 	}
-	if (iter_max< 0 || iter_max > 1000000) {
+	if (iter_max < 0 || iter_max > 1000000) {
                 fprintf(stderr, "Not a valid number of iterations! It should be between 0 and 1000000");
+		exit(EXIT_FAILURE);
         }
         int iter = 0;
         float err = tol + 1;
@@ -93,15 +95,17 @@ int main(int argc, char *argv[]){
   	}	
 	float *d_B = NULL;
 	cudaErr = cudaMalloc((void **)&d_B, size/2);
-	cudaErr = cudaMemcpy(d_A, arr, size, cudaMemcpyHostToDevice);
+	cudaStream_t stream;
+        cudaStreamCreate(&stream);
+	cudaErr = cudaMemcpyAsync(d_A, arr, size, cudaMemcpyHostToDevice, stream);
 	if (cudaErr != cudaSuccess) {
                 fprintf(stderr,
                         "(error code %s)!\n",
                         cudaGetErrorString(cudaErr));
                 exit(EXIT_FAILURE);
         }
-	fillBorders<<<1, 1024>>>(d_A, top, bottom, left, right, m);
-	cudaErr = cudaMemcpy(arr, d_A, size, cudaMemcpyDeviceToHost);
+	fillBorders<<<(m + 1024 - 1)/1024, 1024, 0, stream>>>(d_A, top, bottom, left, right, m);
+	cudaErr = cudaMemcpyAsync(arr, d_A, size, cudaMemcpyDeviceToHost, stream);
 	if (cudaErr != cudaSuccess) {
                 fprintf(stderr,
                         "(error code %s)!\n",
@@ -138,13 +142,11 @@ int main(int argc, char *argv[]){
 
 	void *d_temp_storage = NULL;
         size_t temp_storage_bytes = 0;
-        cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, d_B, d_buff, m*m);
+        cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, d_B, d_buff, m*m, stream);
         cudaMalloc(&d_temp_storage, temp_storage_bytes);
 	bool graphCreated=false;
 	cudaGraph_t graph;
 	cudaGraphExec_t instance;
-	cudaStream_t stream;
-	cudaStreamCreate(&stream);
 
         {
         while(iter < iter_max && flag) {
@@ -186,7 +188,6 @@ int main(int argc, char *argv[]){
                                 cudaGetErrorString(cudaErr));
                                 exit(EXIT_FAILURE);
                 }
-		cudaErr = cudaStreamSynchronize(stream);
 		if (cudaErr != cudaSuccess) {
                                  fprintf(stderr,
                                 "Failed to synchronize the stream (error code %s)!\n",
@@ -195,11 +196,11 @@ int main(int argc, char *argv[]){
                 }
 		iter += 100;
 		subtractArrays<<<grid, block, 0, stream>>>(d_A, d_B, m);
-		cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, d_B, d_buff, m*m);
+		cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, d_B, d_buff, m*m, stream);
 		cudaErr = cudaMemcpyAsync(h_buff, d_buff, sizeof(float), cudaMemcpyDeviceToHost, stream);
 		if (cudaErr != cudaSuccess) {
                                  fprintf(stderr,
-                                "?(error code %s)!\n",
+                                "Failed to copy error back to host memory(error code %s)!\n",
                                 cudaGetErrorString(cudaErr));
                                 exit(EXIT_FAILURE);
                 }
